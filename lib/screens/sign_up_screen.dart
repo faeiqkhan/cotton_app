@@ -11,7 +11,8 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  bool _isLoading = false;
+  String selectedRole =
+      'buyer'; // Default to Buyer (use lowercase for consistency with backend)
 
   Future<void> signUp() async {
     final email = emailController.text.trim();
@@ -19,26 +20,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please fill in all fields')),
+        SnackBar(content: Text('Please enter email and password')),
       );
       return;
     }
 
-    setState(() => _isLoading = true);
-
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.0.202:5000/register'),
+        Uri.parse('http://192.168.0.205:5000/register'), // Backend API
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
+        body: jsonEncode(
+            {'email': email, 'password': password, 'role': selectedRole}),
       );
 
       final responseBody = jsonDecode(response.body);
 
       if (response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Registration Successful! Please log in.')),
+          SnackBar(content: Text('Sign-up successful! Please login.')),
         );
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => SignInScreen()),
@@ -52,8 +53,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
-    } finally {
-      setState(() => _isLoading = false);
     }
   }
 
@@ -67,7 +66,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text("Register", style: TextStyle(fontSize: 28, color: Colors.white)),
+              Text("Create an Account",
+                  style: TextStyle(fontSize: 28, color: Colors.white)),
               SizedBox(height: 20),
               TextField(
                 controller: emailController,
@@ -75,7 +75,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   labelText: 'Email',
                   filled: true,
                   fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
               ),
               SizedBox(height: 10),
@@ -86,27 +87,44 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   labelText: 'Password',
                   filled: true,
                   fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
               ),
+              SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: selectedRole,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                items: ['buyer', 'seller'].map((role) {
+                  return DropdownMenuItem(
+                      value: role, child: Text(role.toUpperCase()));
+                }).toList(),
+                onChanged: (value) {
+                  setState(() => selectedRole = value!);
+                },
+              ),
               SizedBox(height: 20),
-              _isLoading
-                  ? CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: signUp,
-                      child: Text('REGISTER'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.blue.shade900,
-                        minimumSize: Size(double.infinity, 50),
-                      ),
-                    ),
+              ElevatedButton(
+                onPressed: signUp,
+                child: Text('SIGN UP'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.blue.shade900,
+                  minimumSize: Size(double.infinity, 50),
+                ),
+              ),
+              SizedBox(height: 10),
               TextButton(
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => SignInScreen()),
                 ),
-                child: Text("Already have an account? Login",
+                child: Text("Already have an account? Sign In",
                     style: TextStyle(color: Colors.white)),
               ),
             ],

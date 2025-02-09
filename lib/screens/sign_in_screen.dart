@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'home_screen.dart';
 import 'sign_up_screen.dart';
-import 'google_auth_service.dart';
+import 'BuyerDashboard.dart';
+import 'SellerDashboard.dart';
 
 class SignInScreen extends StatefulWidget {
   @override
@@ -31,7 +31,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.0.202:5000/login'), // Localhost for emulator
+        Uri.parse('http://192.168.0.205:5000/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
@@ -39,16 +39,25 @@ class _SignInScreenState extends State<SignInScreen> {
       final responseBody = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        // Store token in SharedPreferences
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', responseBody['token']);
+        await prefs.setString('role', responseBody['role']); // Store role
 
-        // Navigate to Home Screen
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-              builder: (context) => HomeScreen(token: responseBody['token'])),
-        );
+        // Redirect based on role
+        if (responseBody['role'] == 'buyer') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => BuyerDashboard()),
+          );
+        } else if (responseBody['role'] == 'seller') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (context) => SellerDashboard(
+                      sellerEmail: email,
+                    )),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(responseBody['message'] ?? 'Login failed')),
@@ -60,16 +69,6 @@ class _SignInScreenState extends State<SignInScreen> {
       );
     } finally {
       setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> signInWithGoogle() async {
-    final user = await GoogleAuthService.signInWithGoogle();
-    if (user != null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomeScreen(token: user.email)),
-      );
     }
   }
 
