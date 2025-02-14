@@ -23,6 +23,20 @@ MongoClient.connect(url, { useUnifiedTopology: true })
 app.use(cors());
 app.use(bodyParser.json());
 
+// Middleware: Verify JWT Token
+const authenticateToken = (req, res, next) => {
+  const token = req.header("Authorization");
+  if (!token) return res.status(401).json({ message: "Access Denied. No token provided." });
+
+  try {
+    const verified = jwt.verify(token.replace("Bearer ", ""), "your_jwt_secret");
+    req.user = verified;
+    next();
+  } catch (error) {
+    res.status(403).json({ message: "Invalid token" });
+  }
+};
+
 // Register Route
 app.post("/register", async (req, res) => {
   const { email, password, role } = req.body;
@@ -43,7 +57,7 @@ app.post("/register", async (req, res) => {
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error });
   }
 });
 
@@ -66,31 +80,45 @@ app.post("/login", async (req, res) => {
 
     res.json({ token, role: user.role });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error });
   }
 });
 
-app.post('/add-listing', async (req, res) => {
-  const { variety, weight, price, sellerEmail } = req.body;
+// Add New Listing (Seller Only)
+app.post('/add-listing', authenticateToken, async (req, res) => {
+  if (req.user.role !== "seller") {
+    return res.status(403).json({ message: "Only sellers can add listings" });
+  }
 
-  if (!variety || !weight || !price || !sellerEmail) {
-    return res.status(400).json({ message: 'All fields are required' });
+  const {
+    variety, weight, micronaire, length, strength, state, city, distance, priceRange
+  } = req.body;
+  const sellerEmail = req.user.email;
+
+  if (!variety || !weight || !priceRange || !sellerEmail) {
+    return res.status(400).json({ message: "All required fields must be filled" });
   }
 
   try {
-    const result = await db.collection('listings').insertOne({ variety, weight, price, sellerEmail });
-    res.status(201).json({ message: 'Listing added successfully', listingId: result.insertedId });
+    const listingData = {
+      variety, weight, micronaire, length, strength, state, city, distance, priceRange, sellerEmail,
+      createdAt: new Date()
+    };
+
+    const result = await db.collection('listings').insertOne(listingData);
+    res.status(201).json({ message: "Listing added successfully", listingId: result.insertedId });
   } catch (error) {
-    res.status(500).json({ message: 'Database error', error });
+    res.status(500).json({ message: "Database error", error });
   }
 });
 
+// Get All Listings (For Buyers)
 app.get('/listings', async (req, res) => {
   try {
-    const listings = await db.collection('listings').find().toArray();
+    const listings = await db.collection('listings').find().sort({ _id: -1 }).toArray();
     res.status(200).json(listings);
   } catch (error) {
-    res.status(500).json({ message: 'Database error', error });
+    res.status(500).json({ message: "Database error", error });
   }
 });
 
